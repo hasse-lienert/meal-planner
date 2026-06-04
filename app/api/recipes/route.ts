@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-extension-secret',
+}
+
+// Handle preflight
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS })
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,14 +23,14 @@ function getSupabase() {
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-extension-secret')
   if (secret !== process.env.EXTENSION_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS })
   }
 
   const body = await req.json()
   const { nyt_url, title, image_url, description, ingredients, cuisine, cook_time_minutes, yield: recipeYield, raw_json } = body
 
   if (!nyt_url || !title) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: CORS_HEADERS })
   }
 
   const supabase = getSupabase()
@@ -33,10 +44,10 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500, headers: CORS_HEADERS })
   }
 
-  return NextResponse.json({ ok: true, recipe: data })
+  return NextResponse.json({ ok: true, recipe: data }, { headers: CORS_HEADERS })
 }
 
 // GET — list all recipes with last cooked date, for the web app
