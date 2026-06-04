@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Meal Planner — Save Recipe",
+  "version": "1.0",
+  "description": "Save NYT Cooking recipes to your meal planner",
+  "permissions": ["activeTab", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["*://cooking.nytimes.com/recipes/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Meal Planner"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
