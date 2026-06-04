@@ -7,6 +7,7 @@ import type { WeeklyPlan, Recipe } from '@/lib/types'
 export default function ThisWeekPage() {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null)
   const [loading, setLoading] = useState(true)
+  const [cookedId, setCookedId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/plan')
@@ -29,7 +30,8 @@ export default function ThisWeekPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipe_id: recipeId }),
     })
-    alert('Logged as cooked today!')
+    setCookedId(recipeId)
+    setTimeout(() => setCookedId(null), 3000)
   }
 
   if (loading) return <div className="text-stone-400 text-sm">Loading…</div>
@@ -90,7 +92,7 @@ export default function ThisWeekPage() {
                     onClick={() => meal.recipe && logCooked(meal.recipe.id)}
                     className="text-xs px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors"
                   >
-                    ✓ Cooked
+                    {cookedId === meal.recipe?.id ? '✓ Logged!' : '✓ Cooked'}
                   </button>
                   <button
                     onClick={() => removeMeal(meal.id)}

@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import type { Recipe } from '@/lib/types'
 
 const RECENT_DAYS = 21 // suppress recipes cooked within 3 weeks
@@ -19,7 +18,7 @@ export default function LibraryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [addingId, setAddingId] = useState<string | null>(null)
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set())
-  const router = useRouter()
+  const [errorId, setErrorId] = useState<string | null>(null)
 
   // Debounce search
   useEffect(() => {
@@ -37,12 +36,17 @@ export default function LibraryPage() {
 
   async function addToPlan(recipe: Recipe) {
     setAddingId(recipe.id)
-    await fetch('/api/plan', {
+    setErrorId(null)
+    const res = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipe_id: recipe.id }),
     })
-    setAddedIds(s => new Set([...s, recipe.id]))
+    if (res.ok) {
+      setAddedIds(s => new Set([...s, recipe.id]))
+    } else {
+      setErrorId(recipe.id)
+    }
     setAddingId(null)
   }
 
@@ -86,8 +90,8 @@ export default function LibraryPage() {
           return (
             <div
               key={recipe.id}
-              className={`bg-white rounded-xl border p-4 flex gap-3 transition-opacity ${
-                isRecent ? 'opacity-50' : 'border-stone-200'
+              className={`bg-white rounded-xl border border-stone-200 p-4 flex gap-3 transition-opacity ${
+                isRecent ? 'opacity-50' : ''
               }`}
             >
               {recipe.image_url && (
@@ -126,10 +130,12 @@ export default function LibraryPage() {
                     className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
                       isAdded
                         ? 'bg-green-50 text-green-600 cursor-default'
+                        : errorId === recipe.id
+                        ? 'bg-red-50 text-red-600'
                         : 'bg-orange-50 hover:bg-orange-100 text-orange-600'
                     }`}
                   >
-                    {isAdded ? '✓ Added' : addingId === recipe.id ? '…' : '+ This week'}
+                    {isAdded ? '✓ Added' : addingId === recipe.id ? '…' : errorId === recipe.id ? '⚠ Error' : '+ This week'}
                   </button>
                 </div>
               </div>

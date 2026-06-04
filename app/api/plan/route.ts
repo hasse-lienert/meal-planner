@@ -24,17 +24,17 @@ function getMonday(date: Date): string {
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const db = getSupabase()
   const weekStart = getMonday(new Date())
 
-  // Get or create the plan for this week
-  let { data: plan } = await getSupabase()
+  let { data: plan } = await db
     .from('weekly_plans')
     .select('*')
     .eq('week_start', weekStart)
     .single()
 
   if (!plan) {
-    const { data: newPlan } = await getSupabase()
+    const { data: newPlan } = await db
       .from('weekly_plans')
       .insert({ week_start: weekStart })
       .select()
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
   if (!plan) return NextResponse.json({ error: 'Could not get plan' }, { status: 500 })
 
-  const { data: meals } = await getSupabase()
+  const { data: meals } = await db
     .from('plan_meals')
     .select('*, recipe:recipes(*)')
     .eq('plan_id', plan.id)
@@ -60,16 +60,17 @@ export async function POST(req: NextRequest) {
   const { recipe_id, planned_day } = await req.json()
   if (!recipe_id) return NextResponse.json({ error: 'recipe_id required' }, { status: 400 })
 
+  const db = getSupabase()
   const weekStart = getMonday(new Date())
 
-  let { data: plan } = await getSupabase()
+  let { data: plan } = await db
     .from('weekly_plans')
     .select('*')
     .eq('week_start', weekStart)
     .single()
 
   if (!plan) {
-    const { data: newPlan } = await getSupabase()
+    const { data: newPlan } = await db
       .from('weekly_plans')
       .insert({ week_start: weekStart })
       .select()
@@ -77,13 +78,12 @@ export async function POST(req: NextRequest) {
     plan = newPlan
   }
 
-  // Get current count for sort_order
-  const { count } = await getSupabase()
+  const { count } = await db
     .from('plan_meals')
     .select('*', { count: 'exact', head: true })
     .eq('plan_id', plan!.id)
 
-  const { data, error } = await getSupabase()
+  const { data, error } = await db
     .from('plan_meals')
     .insert({ plan_id: plan!.id, recipe_id, planned_day, sort_order: count || 0 })
     .select('*, recipe:recipes(*)')
