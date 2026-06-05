@@ -103,11 +103,7 @@
           if (res.ok) {
             btn.innerText = '✓ Saved!'
             btn.style.background = '#16a34a'
-            setTimeout(() => {
-              btn.innerText = '🍳 Save to Meal Planner'
-              btn.style.background = '#f97316'
-              btn.disabled = false
-            }, 2000)
+            // stays green and disabled — recipe is saved
           } else {
             btn.innerText = '⚠️ Error saving'
             setTimeout(() => { btn.innerText = '🍳 Save to Meal Planner'; btn.disabled = false }, 2000)

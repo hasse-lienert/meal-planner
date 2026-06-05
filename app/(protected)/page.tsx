@@ -102,7 +102,7 @@ export default function ThisWeekPage() {
                           : 'bg-stone-50 hover:bg-stone-100 text-stone-500'
                       }`}
                     >
-                      {isCooked ? '✓ Logged!' : 'Mark cooked'}
+                      {isCooked ? '✓ Cooked!' : 'Mark cooked'}
                     </button>
                     <button
                       onClick={() => removeMeal(meal.id)}
