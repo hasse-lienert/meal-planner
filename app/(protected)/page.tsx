@@ -90,9 +90,13 @@ export default function ThisWeekPage() {
                 <div className="flex gap-2 flex-shrink-0">
                   <button
                     onClick={() => meal.recipe && logCooked(meal.recipe.id)}
-                    className="text-xs px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg transition-colors"
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      cookedId === meal.recipe?.id
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-stone-50 hover:bg-stone-100 text-stone-500'
+                    }`}
                   >
-                    {cookedId === meal.recipe?.id ? '✓ Logged!' : '✓ Cooked'}
+                    {cookedId === meal.recipe?.id ? '✓ Logged!' : 'Mark cooked'}
                   </button>
                   <button
                     onClick={() => removeMeal(meal.id)}
