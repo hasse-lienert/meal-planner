@@ -50,7 +50,19 @@ export async function GET(req: NextRequest) {
     .eq('plan_id', plan.id)
     .order('sort_order')
 
-  return NextResponse.json({ plan: { ...plan, meals: meals || [] } })
+  // Fetch cook log entries for this week's recipes so UI can show cooked state on load
+  const recipeIds = (meals || []).map((m: any) => m.recipe_id).filter(Boolean)
+  let cookedThisWeek: string[] = []
+  if (recipeIds.length > 0) {
+    const { data: logs } = await db
+      .from('cook_log')
+      .select('recipe_id')
+      .in('recipe_id', recipeIds)
+      .gte('cooked_on', weekStart)
+    cookedThisWeek = (logs || []).map((l: any) => l.recipe_id)
+  }
+
+  return NextResponse.json({ plan: { ...plan, meals: meals || [] }, cookedThisWeek })
 }
 
 // POST — add a recipe to this week's plan

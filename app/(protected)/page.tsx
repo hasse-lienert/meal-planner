@@ -2,17 +2,21 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { WeeklyPlan, Recipe } from '@/lib/types'
+import type { WeeklyPlan } from '@/lib/types'
 
 export default function ThisWeekPage() {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null)
   const [loading, setLoading] = useState(true)
-  const [cookedId, setCookedId] = useState<string | null>(null)
+  const [cookedIds, setCookedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetch('/api/plan')
       .then(r => r.json())
-      .then(d => { setPlan(d.plan); setLoading(false) })
+      .then(d => {
+        setPlan(d.plan)
+        setCookedIds(new Set(d.cookedThisWeek || []))
+        setLoading(false)
+      })
   }, [])
 
   async function removeMeal(mealId: string) {
@@ -30,8 +34,7 @@ export default function ThisWeekPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipe_id: recipeId }),
     })
-    setCookedId(recipeId)
-    setTimeout(() => setCookedId(null), 3000)
+    setCookedIds(s => new Set([...s, recipeId]))
   }
 
   if (loading) return <div className="text-stone-400 text-sm">Loading…</div>
@@ -64,51 +67,55 @@ export default function ThisWeekPage() {
       )}
 
       <div className="space-y-3">
-        {plan?.meals.map(meal => (
-          <div key={meal.id} className="bg-white rounded-xl border border-stone-200 p-4 flex gap-4">
-            {meal.recipe?.image_url && (
-              <img
-                src={meal.recipe.image_url}
-                alt={meal.recipe.title}
-                className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
-              />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  {meal.planned_day && (
-                    <span className="text-xs font-medium text-orange-500 uppercase tracking-wide">
-                      {meal.planned_day}
-                    </span>
-                  )}
-                  <h2 className="font-medium text-stone-800 leading-snug">{meal.recipe?.title}</h2>
-                  <p className="text-stone-400 text-xs mt-0.5">
-                    {[meal.recipe?.cuisine, meal.recipe?.cook_time_minutes ? `${meal.recipe.cook_time_minutes} min` : null]
-                      .filter(Boolean).join(' · ')}
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => meal.recipe && logCooked(meal.recipe.id)}
-                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                      cookedId === meal.recipe?.id
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-stone-50 hover:bg-stone-100 text-stone-500'
-                    }`}
-                  >
-                    {cookedId === meal.recipe?.id ? '✓ Logged!' : 'Mark cooked'}
-                  </button>
-                  <button
-                    onClick={() => removeMeal(meal.id)}
-                    className="text-xs px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-500 rounded-lg transition-colors"
-                  >
-                    Remove
-                  </button>
+        {plan?.meals.map(meal => {
+          const isCooked = cookedIds.has(meal.recipe?.id ?? '')
+          return (
+            <div key={meal.id} className="bg-white rounded-xl border border-stone-200 p-4 flex gap-4">
+              {meal.recipe?.image_url && (
+                <img
+                  src={meal.recipe.image_url}
+                  alt={meal.recipe.title}
+                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    {meal.planned_day && (
+                      <span className="text-xs font-medium text-orange-500 uppercase tracking-wide">
+                        {meal.planned_day}
+                      </span>
+                    )}
+                    <h2 className="font-medium text-stone-800 leading-snug">{meal.recipe?.title}</h2>
+                    <p className="text-stone-400 text-xs mt-0.5">
+                      {[meal.recipe?.cuisine, meal.recipe?.cook_time_minutes ? `${meal.recipe.cook_time_minutes} min` : null]
+                        .filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => !isCooked && meal.recipe && logCooked(meal.recipe.id)}
+                      disabled={isCooked}
+                      className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                        isCooked
+                          ? 'bg-green-50 text-green-700 cursor-default'
+                          : 'bg-stone-50 hover:bg-stone-100 text-stone-500'
+                      }`}
+                    >
+                      {isCooked ? '✓ Logged!' : 'Mark cooked'}
+                    </button>
+                    <button
+                      onClick={() => removeMeal(meal.id)}
+                      className="text-xs px-3 py-1.5 bg-stone-50 hover:bg-stone-100 text-stone-500 rounded-lg transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Shopping list */}
