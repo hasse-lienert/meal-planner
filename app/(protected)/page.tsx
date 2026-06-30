@@ -4,10 +4,20 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { WeeklyPlan } from '@/lib/types'
 
+interface Suggestion {
+  title: string
+  url: string
+  reason: string
+}
+
 export default function ThisWeekPage() {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [cookedIds, setCookedIds] = useState<Set<string>>(new Set())
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pantry, setPantry] = useState('')
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
   useEffect(() => {
     fetch('/api/plan')
@@ -26,6 +36,19 @@ export default function ThisWeekPage() {
       body: JSON.stringify({ meal_id: mealId }),
     })
     setPlan(p => p ? { ...p, meals: p.meals.filter(m => m.id !== mealId) } : p)
+  }
+
+  async function getSuggestions() {
+    setSuggesting(true)
+    setSuggestions([])
+    const res = await fetch('/api/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pantry }),
+    })
+    const data = await res.json()
+    setSuggestions(data.suggestions || [])
+    setSuggesting(false)
   }
 
   async function logCooked(recipeId: string) {
@@ -56,6 +79,67 @@ export default function ThisWeekPage() {
         >
           + Add meal
         </Link>
+      </div>
+
+      {/* Recipe picker */}
+      <div className="mb-6">
+        {!pickerOpen ? (
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="text-sm text-orange-500 hover:text-orange-600 font-medium transition-colors"
+          >
+            ✨ Pick meals for me
+          </button>
+        ) : (
+          <div className="bg-white border border-stone-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-stone-700">What do you have to use up? <span className="text-stone-400 font-normal">(optional)</span></p>
+              <button onClick={() => { setPickerOpen(false); setSuggestions([]) }} className="text-stone-400 hover:text-stone-600 text-xs">✕ close</button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={pantry}
+                onChange={e => setPantry(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && getSuggestions()}
+                placeholder="e.g. chicken thighs, spinach, lemon…"
+                className="flex-1 px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+              <button
+                onClick={getSuggestions}
+                disabled={suggesting}
+                className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {suggesting ? '…' : 'Go'}
+              </button>
+            </div>
+
+            {suggesting && (
+              <p className="text-sm text-stone-400">Picking meals for you…</p>
+            )}
+
+            {suggestions.length > 0 && (
+              <div className="space-y-3 pt-1">
+                {suggestions.map((s, i) => (
+                  <div key={i} className="flex items-start justify-between gap-3 py-2 border-t border-stone-100">
+                    <div className="min-w-0">
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-stone-800 hover:text-orange-600 transition-colors"
+                      >
+                        {s.title} ↗
+                      </a>
+                      <p className="text-xs text-stone-400 mt-0.5">{s.reason}</p>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-xs text-stone-400 pt-1">Save any of these via the extension, then add them to this week from the Library.</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {plan?.meals.length === 0 && (
