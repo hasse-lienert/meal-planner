@@ -67,7 +67,6 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
 [
   {
     "title": "Recipe Title",
-    "url": "https://cooking.nytimes.com/recipes/...",
     "reason": "One sentence why this fits"
   }
 ]`
