@@ -82,7 +82,8 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
 
   try {
-    const suggestions = JSON.parse(text)
+    const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
+    const suggestions = JSON.parse(cleaned)
     return NextResponse.json({ suggestions })
   } catch {
     return NextResponse.json({ error: 'Failed to parse suggestions', raw: text }, { status: 500 })
