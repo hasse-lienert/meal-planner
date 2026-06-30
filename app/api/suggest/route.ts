@@ -61,12 +61,12 @@ Taste profile (based on their saved recipes):
 - Recently cooked (avoid repeating these): ${recentTitles.join(', ') || 'nothing yet'}
 ${pantry ? `- Ingredients to use up this week: ${pantry}` : ''}
 
-Suggest 3 specific NYT Cooking recipes for this week. Pick things that fit their taste but that feel fresh — not too similar to each other or to what they've made recently. ${pantry ? 'Prioritise recipes that use the pantry ingredients.' : ''}
+Suggest 3 weeknight dinner ideas for this week that fit their taste but feel fresh — not too similar to each other or to what they've made recently. ${pantry ? 'Prioritise ideas that use the pantry ingredients.' : ''} Give each idea a short, descriptive dish name (e.g. "Miso-Glazed Salmon", "Spicy Pork Larb", "Roasted Cauliflower with Tahini") — something that works well as a search term on NYT Cooking, not a made-up specific recipe title.
 
 Return ONLY a JSON array with exactly 3 objects, no other text:
 [
   {
-    "title": "Recipe Title",
+    "title": "Dish Name",
     "reason": "One sentence why this fits"
   }
 ]`
