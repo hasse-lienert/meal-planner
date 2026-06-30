@@ -23,8 +23,6 @@ export async function POST(req: NextRequest) {
   const { data: recipes } = await db
     .from('recipes')
     .select('title, cuisine, ingredients')
-    .order('created_at', { ascending: false })
-    .limit(50)
 
   // Recent cook log — last 3 weeks
   const threeWeeksAgo = new Date()
