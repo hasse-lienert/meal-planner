@@ -123,7 +123,7 @@ export default function ThisWeekPage() {
                   <div key={i} className="flex items-start justify-between gap-3 py-2 border-t border-stone-100">
                     <div className="min-w-0">
                       <a
-                        href={`https://cooking.nytimes.com/search?q=${encodeURIComponent(s.title)}`}
+                        href={`https://www.google.com/search?q=NYT+Cooking+${encodeURIComponent(s.title)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-medium text-stone-800 hover:text-orange-600 transition-colors"
