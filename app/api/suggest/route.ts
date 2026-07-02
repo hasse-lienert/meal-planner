@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { isValidSession } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -10,7 +11,7 @@ function getSupabase() {
 }
 
 function authed(req: NextRequest) {
-  return req.cookies.get('mp_session')?.value === 'authenticated'
+  return isValidSession(req.cookies.get('mp_session')?.value)
 }
 
 export async function POST(req: NextRequest) {
@@ -22,7 +23,8 @@ export async function POST(req: NextRequest) {
   // Build lean taste profile from saved library
   const { data: recipes } = await db
     .from('recipes')
-    .select('title, cuisine, ingredients')
+    .select('title, cuisine, ingredients, nyt_url')
+    .order('created_at', { ascending: false })
 
   // Recent cook log — last 3 weeks
   const threeWeeksAgo = new Date()
@@ -51,10 +53,14 @@ export async function POST(req: NextRequest) {
     .map((l: any) => l.recipes?.title)
     .filter(Boolean)
 
+  // Recipe titles carry the richest taste signal — cuisine tags are often missing from NYT data
+  const savedTitles = (recipes || []).map(r => r.title).slice(0, 30)
+
   const prompt = `You are a meal planning assistant helping pick weeknight dinners from NYT Cooking.
 
 Taste profile (based on their saved recipes):
-- Cuisines they enjoy: ${cuisines.join(', ') || 'varied'}
+- Recipes they've saved: ${savedTitles.join('; ') || 'none yet'}
+${cuisines.length ? `- Cuisines they enjoy: ${cuisines.join(', ')}` : ''}
 - Ingredients they cook with often: ${topIngredients.join(', ') || 'varied'}
 - Recently cooked (avoid repeating these): ${recentTitles.join(', ') || 'nothing yet'}
 ${pantry ? `- Ingredients to use up this week: ${pantry}` : ''}
@@ -78,11 +84,51 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
 
+  let ideas: { title: string; reason: string }[]
   try {
     const cleaned = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/i, '').trim()
-    const suggestions = JSON.parse(cleaned)
-    return NextResponse.json({ suggestions })
+    ideas = JSON.parse(cleaned)
   } catch {
     return NextResponse.json({ error: 'Failed to parse suggestions', raw: text }, { status: 500 })
+  }
+
+  // Search NYT Cooking for each idea and return real recipes, skipping ones already saved
+  const savedUrls = new Set((recipes || []).map(r => r.nyt_url))
+  const results = await Promise.all(
+    ideas.map(async idea => {
+      const found = await searchNyt(idea.title)
+      const fresh = found.find(f => !savedUrls.has(f.url))
+      return fresh
+        ? { title: fresh.title, url: fresh.url, reason: idea.reason }
+        : { title: idea.title, url: null, reason: idea.reason }
+    })
+  )
+
+  return NextResponse.json({ suggestions: results })
+}
+
+// Scrape NYT Cooking search results — returns recipes in page order
+async function searchNyt(query: string): Promise<{ title: string; url: string }[]> {
+  try {
+    const res = await fetch(
+      `https://cooking.nytimes.com/search?q=${encodeURIComponent(query)}`,
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' },
+        signal: AbortSignal.timeout(8000),
+      }
+    )
+    if (!res.ok) return []
+    const html = await res.text()
+    const seen = new Set<string>()
+    const results: { title: string; url: string }[] = []
+    for (const m of html.matchAll(/href="(\/recipes\/(\d+)-([a-z0-9-]+))"/g)) {
+      if (seen.has(m[2])) continue
+      seen.add(m[2])
+      const title = m[3].split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+      results.push({ title, url: `https://cooking.nytimes.com${m[1]}` })
+    }
+    return results
+  } catch {
+    return []
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isValidSession } from '@/lib/auth'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   // Check session cookie for web app requests
   const session = req.cookies.get('mp_session')
-  if (session?.value !== 'authenticated') {
+  if (!isValidSession(session?.value)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

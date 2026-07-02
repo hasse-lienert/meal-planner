@@ -6,6 +6,7 @@ import type { WeeklyPlan } from '@/lib/types'
 
 interface Suggestion {
   title: string
+  url: string | null
   reason: string
 }
 
@@ -123,7 +124,7 @@ export default function ThisWeekPage() {
                   <div key={i} className="flex items-start justify-between gap-3 py-2 border-t border-stone-100">
                     <div className="min-w-0">
                       <a
-                        href={`https://www.google.com/search?q=site%3Acooking.nytimes.com+${encodeURIComponent(`"${s.title}"`)}`}
+                        href={s.url ?? `https://cooking.nytimes.com/search?q=${encodeURIComponent(s.title)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm font-medium text-stone-800 hover:text-orange-600 transition-colors"

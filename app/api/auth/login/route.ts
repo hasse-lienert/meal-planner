@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sessionToken } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json()
@@ -8,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   const res = NextResponse.json({ ok: true })
-  res.cookies.set('mp_session', 'authenticated', {
+  res.cookies.set('mp_session', sessionToken(), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

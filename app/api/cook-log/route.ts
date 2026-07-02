@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isValidSession } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -9,7 +10,7 @@ function getSupabase() {
 }
 
 function authed(req: NextRequest) {
-  return req.cookies.get('mp_session')?.value === 'authenticated'
+  return isValidSession(req.cookies.get('mp_session')?.value)
 }
 
 export async function POST(req: NextRequest) {
