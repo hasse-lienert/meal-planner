@@ -40,6 +40,14 @@ create table if not exists plan_meals (
   created_at timestamptz default now()
 );
 
+-- Shared kitchen preferences (staples we always have, ingredients to never suggest,
+-- max weeknight cook time). Key/value so new preferences don't need a migration.
+create table if not exists app_settings (
+  key text primary key,
+  value text,
+  updated_at timestamptz default now()
+);
+
 -- Indexes
 create index if not exists idx_cook_log_recipe_id on cook_log(recipe_id);
 create index if not exists idx_cook_log_cooked_on on cook_log(cooked_on desc);

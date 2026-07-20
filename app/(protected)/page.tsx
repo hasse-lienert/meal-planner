@@ -20,15 +20,22 @@ export default function ThisWeekPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pantry, setPantry] = useState('')
   const [avoid, setAvoid] = useState('')
+  const [staples, setStaples] = useState('')
   const [maxMinutes, setMaxMinutes] = useState(45)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
 
-  // Avoid list and time cap are stable preferences — remember them between visits
+  // Kitchen preferences are shared between both of us, so they live on the server
   useEffect(() => {
-    setAvoid(localStorage.getItem('mp_avoid') || '')
-    const saved = Number(localStorage.getItem('mp_max_minutes'))
-    if (saved) setMaxMinutes(saved)
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => {
+        const s = d.settings || {}
+        setAvoid(s.avoid || '')
+        setStaples(s.staples || '')
+        if (Number(s.max_minutes)) setMaxMinutes(Number(s.max_minutes))
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -53,12 +60,15 @@ export default function ThisWeekPage() {
   async function getSuggestions() {
     setSuggesting(true)
     setSuggestions([])
-    localStorage.setItem('mp_avoid', avoid)
-    localStorage.setItem('mp_max_minutes', String(maxMinutes))
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avoid, staples, max_minutes: maxMinutes }),
+    }).catch(() => {})
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pantry, avoid, maxMinutes }),
+      body: JSON.stringify({ pantry, avoid, staples, maxMinutes }),
     })
     const data = await res.json()
     setSuggestions(data.suggestions || [])
@@ -127,6 +137,15 @@ export default function ThisWeekPage() {
                 {suggesting ? '…' : 'Go'}
               </button>
             </div>
+
+            <input
+              type="text"
+              value={staples}
+              onChange={e => setStaples(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && getSuggestions()}
+              placeholder="Always in our kitchen… (e.g. gochujang, harissa, fish sauce)"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
 
             <input
               type="text"

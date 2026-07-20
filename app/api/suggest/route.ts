@@ -17,9 +17,23 @@ function authed(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { pantry, avoid, maxMinutes } = await req.json()
+  const { pantry, avoid, staples, maxMinutes } = await req.json()
   const timeCap = typeof maxMinutes === 'number' && maxMinutes > 0 ? maxMinutes : 45
   const db = getSupabase()
+
+  // Generic examples of "buy a whole jar, never finish it" ingredients. Anything the
+  // user keeps on hand is dropped from the list so the prompt doesn't contradict itself.
+  const stapleList = String(staples || '')
+    .split(/[,\n]/)
+    .map(s => s.trim().toLowerCase())
+    .filter(s => s.length >= 3)
+  const specialtyExamples = [
+    'Thai curry paste',
+    'molasses',
+    'tamarind concentrate',
+    'preserved lemons',
+    'miso',
+  ].filter(ex => !stapleList.some(s => matchesStaple(ex, s)))
 
   // Build lean taste profile from saved library
   const { data: recipes } = await db
@@ -65,13 +79,14 @@ ${cuisines.length ? `- Cuisines they enjoy: ${cuisines.join(', ')}` : ''}
 - Ingredients they cook with often: ${topIngredients.join(', ') || 'varied'}
 - Recently cooked (avoid repeating these): ${recentTitles.join(', ') || 'nothing yet'}
 ${pantry ? `- Ingredients to use up this week: ${pantry}` : ''}
+${staples ? `- Always in their kitchen, free to build a dish around: ${staples}` : ''}
 ${avoid ? `- Ingredients they do NOT want: ${avoid}` : ''}
 
 Suggest 3 weeknight dinner ideas for this week that fit their taste but feel fresh — not too similar to each other or to what they've made recently. ${pantry ? 'Prioritise ideas that use the pantry ingredients.' : ''}
 
 Hard constraints — a suggestion that breaks these is useless to them:
 - Must be realistic to cook on a weeknight in about ${timeCap} minutes or less, start to finish.
-- Build on common supermarket staples. Do NOT suggest dishes that hinge on a specialty ingredient they'd have to buy a whole jar or packet of and would then struggle to use up (e.g. Thai curry paste, molasses, tamarind concentrate, preserved lemons, miso) unless that ingredient already appears in their saved recipes or pantry list above.
+- Build on common supermarket staples. Do NOT suggest dishes that hinge on a specialty ingredient they'd have to buy a whole jar or packet of and would then struggle to use up${specialtyExamples.length ? ` (e.g. ${specialtyExamples.join(', ')})` : ''} — unless it appears in their saved recipes, their pantry input, or their always-in-the-kitchen list above, in which case it is completely fine.
 ${avoid ? `- Do not use the ingredients they listed as unwanted.` : ''}
 
 Give each idea a short, descriptive dish name (e.g. "Miso-Glazed Salmon", "Spicy Pork Larb", "Roasted Cauliflower with Tahini") — something that works well as a search term on NYT Cooking, not a made-up specific recipe title.
@@ -117,6 +132,16 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
   )
 
   return NextResponse.json({ suggestions: results })
+}
+
+// Loose match so "red curry paste" on the staples list also clears "Thai curry paste"
+// from the examples — two shared significant words is enough.
+function matchesStaple(example: string, staple: string): boolean {
+  const ex = example.toLowerCase()
+  if (ex.includes(staple) || staple.includes(ex)) return true
+  const exWords = new Set(ex.match(/[a-z]{4,}/g) || [])
+  const shared = (staple.match(/[a-z]{4,}/g) || []).filter(w => exWords.has(w))
+  return shared.length >= 2
 }
 
 interface NytResult {
