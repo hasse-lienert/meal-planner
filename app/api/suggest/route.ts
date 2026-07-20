@@ -71,7 +71,7 @@ Suggest 3 weeknight dinner ideas for this week that fit their taste but feel fre
 
 Hard constraints — a suggestion that breaks these is useless to them:
 - Must be realistic to cook on a weeknight in about ${timeCap} minutes or less, start to finish.
-- Build on common supermarket staples. Do NOT suggest dishes that hinge on a specialty ingredient they'd have to buy a whole jar or packet of and would then struggle to use up (e.g. Thai curry paste, molasses, gochujang, tamarind concentrate, preserved lemons, harissa, miso) unless that ingredient already appears in their saved recipes or pantry list above.
+- Build on common supermarket staples. Do NOT suggest dishes that hinge on a specialty ingredient they'd have to buy a whole jar or packet of and would then struggle to use up (e.g. Thai curry paste, molasses, tamarind concentrate, preserved lemons, miso) unless that ingredient already appears in their saved recipes or pantry list above.
 ${avoid ? `- Do not use the ingredients they listed as unwanted.` : ''}
 
 Give each idea a short, descriptive dish name (e.g. "Miso-Glazed Salmon", "Spicy Pork Larb", "Roasted Cauliflower with Tahini") — something that works well as a search term on NYT Cooking, not a made-up specific recipe title.
