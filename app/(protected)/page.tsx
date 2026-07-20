@@ -25,6 +25,7 @@ export default function ThisWeekPage() {
   const [maxMinutes, setMaxMinutes] = useState(45)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+  const [settingsError, setSettingsError] = useState<string | null>(null)
 
   // Kitchen preferences are shared between both of us, so they live on the server
   useEffect(() => {
@@ -35,8 +36,9 @@ export default function ThisWeekPage() {
         setAvoid(s.avoid || '')
         setStaples(s.staples || '')
         if (Number(s.max_minutes)) setMaxMinutes(Number(s.max_minutes))
+        if (d.error) setSettingsError(d.error)
       })
-      .catch(() => {})
+      .catch(e => setSettingsError(e.message))
   }, [])
 
   useEffect(() => {
@@ -50,12 +52,18 @@ export default function ThisWeekPage() {
   }, [])
 
   // Kitchen preferences save as soon as they change, not just when suggestions run
-  function persist(patch: { staples?: string; avoid?: string; max_minutes?: number }) {
-    fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    }).catch(() => {})
+  async function persist(patch: { staples?: string; avoid?: string; max_minutes?: number }) {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      const data = await res.json().catch(() => ({}))
+      setSettingsError(res.ok ? null : data.error || `Save failed (${res.status})`)
+    } catch (e) {
+      setSettingsError(e instanceof Error ? e.message : 'Save failed')
+    }
   }
 
   async function removeMeal(mealId: string) {
@@ -142,6 +150,12 @@ export default function ThisWeekPage() {
                 {suggesting ? '…' : 'Go'}
               </button>
             </div>
+
+            {settingsError && (
+              <p className="text-xs text-red-600 bg-red-50 rounded-md px-2.5 py-2">
+                Preferences aren’t saving: {settingsError}
+              </p>
+            )}
 
             <div className="pt-1">
               <p className="text-xs font-medium text-stone-500 mb-1.5">Always in our kitchen</p>

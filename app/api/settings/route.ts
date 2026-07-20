@@ -18,10 +18,11 @@ function authed(req: NextRequest) {
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Missing table (migration not run yet) shouldn't break the page — fall back to empty
-  const { data } = await getSupabase().from('app_settings').select('key, value')
+  // A broken settings table shouldn't take the page down, but it must not fail
+  // silently either — surface the reason so it's visible in the UI.
+  const { data, error } = await getSupabase().from('app_settings').select('key, value')
   const settings = Object.fromEntries((data || []).map(r => [r.key, r.value]))
-  return NextResponse.json({ settings })
+  return NextResponse.json({ settings, error: error?.message ?? null })
 }
 
 export async function PUT(req: NextRequest) {
