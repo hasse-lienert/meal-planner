@@ -48,6 +48,14 @@ create table if not exists app_settings (
   updated_at timestamptz default now()
 );
 
+-- RLS is on by default here, so the anon role needs an explicit policy or every
+-- write fails with "new row violates row-level security policy". Access control
+-- for this app happens at the application layer (shared password), not in Postgres.
+alter table app_settings enable row level security;
+drop policy if exists "anon full access" on app_settings;
+create policy "anon full access" on app_settings
+  for all to anon using (true) with check (true);
+
 -- Indexes
 create index if not exists idx_cook_log_recipe_id on cook_log(recipe_id);
 create index if not exists idx_cook_log_cooked_on on cook_log(cooked_on desc);
