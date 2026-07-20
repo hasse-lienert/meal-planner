@@ -7,8 +7,11 @@ import type { WeeklyPlan } from '@/lib/types'
 interface Suggestion {
   title: string
   url: string | null
+  cook_time: string | null
   reason: string
 }
+
+const TIME_OPTIONS = [30, 45, 60]
 
 export default function ThisWeekPage() {
   const [plan, setPlan] = useState<WeeklyPlan | null>(null)
@@ -16,8 +19,17 @@ export default function ThisWeekPage() {
   const [cookedIds, setCookedIds] = useState<Set<string>>(new Set())
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pantry, setPantry] = useState('')
+  const [avoid, setAvoid] = useState('')
+  const [maxMinutes, setMaxMinutes] = useState(45)
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+
+  // Avoid list and time cap are stable preferences — remember them between visits
+  useEffect(() => {
+    setAvoid(localStorage.getItem('mp_avoid') || '')
+    const saved = Number(localStorage.getItem('mp_max_minutes'))
+    if (saved) setMaxMinutes(saved)
+  }, [])
 
   useEffect(() => {
     fetch('/api/plan')
@@ -41,10 +53,12 @@ export default function ThisWeekPage() {
   async function getSuggestions() {
     setSuggesting(true)
     setSuggestions([])
+    localStorage.setItem('mp_avoid', avoid)
+    localStorage.setItem('mp_max_minutes', String(maxMinutes))
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pantry }),
+      body: JSON.stringify({ pantry, avoid, maxMinutes }),
     })
     const data = await res.json()
     setSuggestions(data.suggestions || [])
@@ -114,6 +128,32 @@ export default function ThisWeekPage() {
               </button>
             </div>
 
+            <input
+              type="text"
+              value={avoid}
+              onChange={e => setAvoid(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && getSuggestions()}
+              placeholder="Never suggest… (e.g. molasses, curry paste)"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400">Max time:</span>
+              {TIME_OPTIONS.map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMaxMinutes(m)}
+                  className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
+                    maxMinutes === m
+                      ? 'bg-orange-100 text-orange-700 font-medium'
+                      : 'bg-stone-50 hover:bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  {m} min
+                </button>
+              ))}
+            </div>
+
             {suggesting && (
               <p className="text-sm text-stone-400">Picking meals for you…</p>
             )}
@@ -131,6 +171,9 @@ export default function ThisWeekPage() {
                       >
                         {s.title} ↗
                       </a>
+                      {s.cook_time && (
+                        <span className="text-xs text-stone-400 ml-2">{s.cook_time}</span>
+                      )}
                       <p className="text-xs text-stone-400 mt-0.5">{s.reason}</p>
                     </div>
                   </div>

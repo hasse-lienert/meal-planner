@@ -17,7 +17,8 @@ function authed(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { pantry } = await req.json()
+  const { pantry, avoid, maxMinutes } = await req.json()
+  const timeCap = typeof maxMinutes === 'number' && maxMinutes > 0 ? maxMinutes : 45
   const db = getSupabase()
 
   // Build lean taste profile from saved library
@@ -64,8 +65,16 @@ ${cuisines.length ? `- Cuisines they enjoy: ${cuisines.join(', ')}` : ''}
 - Ingredients they cook with often: ${topIngredients.join(', ') || 'varied'}
 - Recently cooked (avoid repeating these): ${recentTitles.join(', ') || 'nothing yet'}
 ${pantry ? `- Ingredients to use up this week: ${pantry}` : ''}
+${avoid ? `- Ingredients they do NOT want: ${avoid}` : ''}
 
-Suggest 3 weeknight dinner ideas for this week that fit their taste but feel fresh — not too similar to each other or to what they've made recently. ${pantry ? 'Prioritise ideas that use the pantry ingredients.' : ''} Give each idea a short, descriptive dish name (e.g. "Miso-Glazed Salmon", "Spicy Pork Larb", "Roasted Cauliflower with Tahini") — something that works well as a search term on NYT Cooking, not a made-up specific recipe title.
+Suggest 3 weeknight dinner ideas for this week that fit their taste but feel fresh — not too similar to each other or to what they've made recently. ${pantry ? 'Prioritise ideas that use the pantry ingredients.' : ''}
+
+Hard constraints — a suggestion that breaks these is useless to them:
+- Must be realistic to cook on a weeknight in about ${timeCap} minutes or less, start to finish.
+- Build on common supermarket staples. Do NOT suggest dishes that hinge on a specialty ingredient they'd have to buy a whole jar or packet of and would then struggle to use up (e.g. Thai curry paste, molasses, gochujang, tamarind concentrate, preserved lemons, harissa, miso) unless that ingredient already appears in their saved recipes or pantry list above.
+${avoid ? `- Do not use the ingredients they listed as unwanted.` : ''}
+
+Give each idea a short, descriptive dish name (e.g. "Miso-Glazed Salmon", "Spicy Pork Larb", "Roasted Cauliflower with Tahini") — something that works well as a search term on NYT Cooking, not a made-up specific recipe title.
 
 Return ONLY a JSON array with exactly 3 objects, no other text:
 [
@@ -92,23 +101,47 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
     return NextResponse.json({ error: 'Failed to parse suggestions', raw: text }, { status: 500 })
   }
 
-  // Search NYT Cooking for each idea and return real recipes, skipping ones already saved
+  // Search NYT Cooking for each idea, preferring recipes that fit the time cap and
+  // aren't already in the library
   const savedUrls = new Set((recipes || []).map(r => r.nyt_url))
   const results = await Promise.all(
     ideas.map(async idea => {
-      const found = await searchNyt(idea.title)
-      const fresh = found.find(f => !savedUrls.has(f.url))
-      return fresh
-        ? { title: fresh.title, url: fresh.url, reason: idea.reason }
-        : { title: idea.title, url: null, reason: idea.reason }
+      const found = (await searchNyt(idea.title)).filter(f => !savedUrls.has(f.url))
+      const match =
+        found.find(f => f.minutes !== null && f.minutes <= timeCap) ??
+        found.find(f => f.minutes === null)
+      return match
+        ? { title: match.title, url: match.url, cook_time: match.cook_time, reason: idea.reason }
+        : { title: idea.title, url: null, cook_time: null, reason: idea.reason }
     })
   )
 
   return NextResponse.json({ suggestions: results })
 }
 
-// Scrape NYT Cooking search results — returns recipes in page order
-async function searchNyt(query: string): Promise<{ title: string; url: string }[]> {
+interface NytResult {
+  title: string
+  url: string
+  cook_time: string | null
+  minutes: number | null
+}
+
+// "1 hour 45 minutes", "1 3/4 hours", "40 minutes" → total minutes
+function parseMinutes(s: string): number | null {
+  const frac: Record<string, number> = { '1/4': 0.25, '1/2': 0.5, '3/4': 0.75 }
+  let total = 0
+  const hours = s.match(/(\d+)?\s*(1\/4|1\/2|3\/4)?\s*hours?/)
+  if (hours) {
+    total += (hours[1] ? parseInt(hours[1]) : 0) * 60
+    if (hours[2]) total += frac[hours[2]] * 60
+  }
+  const mins = s.match(/(\d+)\s*minutes?/)
+  if (mins) total += parseInt(mins[1])
+  return total > 0 ? Math.round(total) : null
+}
+
+// Scrape NYT Cooking search results — returns recipe cards in page order
+async function searchNyt(query: string): Promise<NytResult[]> {
   try {
     const res = await fetch(
       `https://cooking.nytimes.com/search?q=${encodeURIComponent(query)}`,
@@ -119,13 +152,21 @@ async function searchNyt(query: string): Promise<{ title: string; url: string }[
     )
     if (!res.ok) return []
     const html = await res.text()
+
+    const results: NytResult[] = []
     const seen = new Set<string>()
-    const results: { title: string; url: string }[] = []
-    for (const m of html.matchAll(/href="(\/recipes\/(\d+)-([a-z0-9-]+))"/g)) {
-      if (seen.has(m[2])) continue
-      seen.add(m[2])
-      const title = m[3].split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
-      results.push({ title, url: `https://cooking.nytimes.com${m[1]}` })
+    for (const card of html.split('recipecard_recipeCard__').slice(1)) {
+      const href = card.match(/href="(\/recipes\/(\d+)-[a-z0-9-]+)"/)
+      const title = card.match(/atoms_cardTitle__[^"]*">([^<]+)</)
+      if (!href || !title || seen.has(href[2])) continue
+      seen.add(href[2])
+      const time = card.match(/recipecard_cookTime__[^"]*">([^<]+)</)?.[1].trim() ?? null
+      results.push({
+        title: title[1].trim(),
+        url: `https://cooking.nytimes.com${href[1]}`,
+        cook_time: time,
+        minutes: time ? parseMinutes(time) : null,
+      })
     }
     return results
   } catch {
