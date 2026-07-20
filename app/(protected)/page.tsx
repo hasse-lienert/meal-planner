@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import TagInput from '@/components/TagInput'
 import type { WeeklyPlan } from '@/lib/types'
 
 interface Suggestion {
@@ -48,6 +49,15 @@ export default function ThisWeekPage() {
       })
   }, [])
 
+  // Kitchen preferences save as soon as they change, not just when suggestions run
+  function persist(patch: { staples?: string; avoid?: string; max_minutes?: number }) {
+    fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }).catch(() => {})
+  }
+
   async function removeMeal(mealId: string) {
     await fetch('/api/plan', {
       method: 'DELETE',
@@ -60,11 +70,6 @@ export default function ThisWeekPage() {
   async function getSuggestions() {
     setSuggesting(true)
     setSuggestions([])
-    fetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avoid, staples, max_minutes: maxMinutes }),
-    }).catch(() => {})
     const res = await fetch('/api/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -138,30 +143,32 @@ export default function ThisWeekPage() {
               </button>
             </div>
 
-            <input
-              type="text"
-              value={staples}
-              onChange={e => setStaples(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && getSuggestions()}
-              placeholder="Always in our kitchen… (e.g. gochujang, harissa, fish sauce)"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
+            <div className="pt-1">
+              <p className="text-xs font-medium text-stone-500 mb-1.5">Always in our kitchen</p>
+              <TagInput
+                value={staples}
+                onChange={v => { setStaples(v); persist({ staples: v }) }}
+                placeholder="Add an ingredient, then Enter…"
+                chipClass="bg-green-50 text-green-700"
+              />
+            </div>
 
-            <input
-              type="text"
-              value={avoid}
-              onChange={e => setAvoid(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && getSuggestions()}
-              placeholder="Never suggest… (e.g. molasses, curry paste)"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
+            <div>
+              <p className="text-xs font-medium text-stone-500 mb-1.5">Never suggest</p>
+              <TagInput
+                value={avoid}
+                onChange={v => { setAvoid(v); persist({ avoid: v }) }}
+                placeholder="Add an ingredient, then Enter…"
+                chipClass="bg-red-50 text-red-600"
+              />
+            </div>
 
             <div className="flex items-center gap-2">
               <span className="text-xs text-stone-400">Max time:</span>
               {TIME_OPTIONS.map(m => (
                 <button
                   key={m}
-                  onClick={() => setMaxMinutes(m)}
+                  onClick={() => { setMaxMinutes(m); persist({ max_minutes: m }) }}
                   className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
                     maxMinutes === m
                       ? 'bg-orange-100 text-orange-700 font-medium'
