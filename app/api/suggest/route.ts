@@ -116,22 +116,39 @@ Return ONLY a JSON array with exactly 3 objects, no other text:
     return NextResponse.json({ error: 'Failed to parse suggestions', raw: text }, { status: 500 })
   }
 
-  // Search NYT Cooking for each idea, preferring recipes that fit the time cap and
-  // aren't already in the library
+  // The avoid list is only a soft hint to Claude in the prompt — the recipe we
+  // actually surface comes from the NYT search below, so filter its titles too.
+  const avoidWords = String(avoid || '')
+    .split(/[,\n]/)
+    .map(s => s.trim().toLowerCase())
+    .filter(s => s.length >= 3)
+  const allowed = (title: string) => {
+    const t = title.toLowerCase()
+    return !avoidWords.some(w => t.includes(w))
+  }
+
+  // Search NYT Cooking for each idea, preferring recipes that fit the time cap,
+  // aren't already in the library, and don't include an excluded ingredient
   const savedUrls = new Set((recipes || []).map(r => r.nyt_url))
   const results = await Promise.all(
     ideas.map(async idea => {
-      const found = (await searchNyt(idea.title)).filter(f => !savedUrls.has(f.url))
+      const found = (await searchNyt(idea.title)).filter(
+        f => !savedUrls.has(f.url) && allowed(f.title)
+      )
       const match =
         found.find(f => f.minutes !== null && f.minutes <= timeCap) ??
         found.find(f => f.minutes === null)
+      const cleanIdea = allowed(idea.title)
       return match
         ? { title: match.title, url: match.url, cook_time: match.cook_time, reason: idea.reason }
-        : { title: idea.title, url: null, cook_time: null, reason: idea.reason }
+        : cleanIdea
+        ? { title: idea.title, url: null, cook_time: null, reason: idea.reason }
+        : null
     })
   )
+  const suggestions = results.filter(Boolean)
 
-  return NextResponse.json({ suggestions: results })
+  return NextResponse.json({ suggestions })
 }
 
 // Loose match so "red curry paste" on the staples list also clears "Thai curry paste"
