@@ -56,6 +56,13 @@ drop policy if exists "anon full access" on app_settings;
 create policy "anon full access" on app_settings
   for all to anon using (true) with check (true);
 
+-- Since Oct 30 2026, Supabase no longer auto-grants Data API access to new tables
+-- in "public", so a fresh project or db reset needs these or every request fails
+-- with "permission denied". anon gets full access because the app writes through it.
+grant select, insert, update, delete
+  on recipes, cook_log, weekly_plans, plan_meals, app_settings
+  to anon, authenticated, service_role;
+
 -- Indexes
 create index if not exists idx_cook_log_recipe_id on cook_log(recipe_id);
 create index if not exists idx_cook_log_cooked_on on cook_log(cooked_on desc);
